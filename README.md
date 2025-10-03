@@ -1,53 +1,21 @@
-# Camera Monitor
+# Camera Monitor System
 
-A lightweight, real-time IP camera monitoring system built with Node.js and Express. Features a clean web interface that displays multiple RTSP camera feeds in a 2x2 grid layout, perfect for security monitoring or kiosk displays.
+A web-based RTSP camera monitoring system designed for Raspberry Pi with auto-launch at boot and fullscreen display.
 
-## ✨ Features
+## Features
 
-- **Real-time MJPEG streaming** from RTSP cameras
-- **2x2 grid layout** optimized for fullscreen viewing  
-- **Auto-reconnection** with progressive retry delays
-- **Kiosk mode** with automatic fullscreen
-- **Health monitoring** and stream management
-- **Responsive design** adapting to different screen sizes
-- **Conservative resource usage** with 8fps @ 640x480 for reliability
-- **Manual reconnection controls** for individual cameras or all at once
+- 4-camera grid layout optimized for fullscreen viewing
+- Secure credential management via configuration file
+- Auto-launch at boot with kiosk mode
+- Real-time RTSP streaming via WebSocket and FFmpeg
+- Connection status indicators and automatic reconnection
+- Responsive design with fullscreen controls
 
-## 🚀 Quick Start
+## Setup Complete ✅
 
-### Prerequisites
-- **Node.js** (v14 or higher)
-- **FFmpeg** with RTSP support
-- **IP cameras** with RTSP streaming capability
+The system has been installed and configured to run automatically at boot.
 
-### Installation
-
-1. **Clone the repository:**
-   ```bash
-   git clone <repository-url>
-   cd camera-monitor
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Configure your cameras:**
-   ```bash
-   cp config.example.json config.json
-   ```
-   Edit `config.json` with your camera details (see Configuration section below)
-
-4. **Start the server:**
-   ```bash
-   npm start
-   ```
-
-5. **Open in browser:**
-   Navigate to `http://localhost:3000`
-
-## 📝 Configuration
+## Configuration
 
 ### Camera Credentials
 
@@ -75,72 +43,7 @@ Update the RTSP URLs for your cameras. Example:
 }
 ```
 
-### RTSP URL Formats
-
-Common RTSP URL patterns for different camera brands:
-
-- **Hikvision:** `rtsp://username:password@ip:554/Streaming/Channels/101`
-- **Dahua:** `rtsp://username:password@ip:554/cam/realmonitor?channel=1&subtype=0`
-- **Axis:** `rtsp://username:password@ip:554/axis-media/media.amp`
-- **Generic:** `rtsp://username:password@ip:port/stream`
-
-## 🏢 Architecture
-
-### Backend (Node.js/Express)
-- **MJPEG streaming server** using FFmpeg to transcode RTSP streams
-- **RESTful API** for camera configuration and health monitoring
-- **Stream management** with automatic cleanup and memory leak prevention
-- **Progressive reconnection** with backoff strategy
-
-### Frontend (Vanilla JavaScript)
-- **Responsive grid layout** with CSS Grid
-- **Real-time stream display** using MJPEG over HTTP
-- **Connection status indicators** and error handling
-- **Manual control interface** for stream management
-
-### RTSP Processing Pipeline
-```
-RTSP Source → FFmpeg → MJPEG → HTTP Stream → Browser Display
-```
-
-## 🔒 Security Considerations
-
-### Credential Management
-- **Never commit** `config.json` with real credentials to version control
-- Use **strong passwords** for camera accounts  
-- Consider **VPN access** for remote monitoring
-- Enable **camera firmware updates** regularly
-
-### Network Security
-- **Isolate cameras** on separate VLAN if possible
-- **Change default passwords** on all cameras
-- **Disable unnecessary services** on cameras
-- **Monitor network traffic** for anomalies
-
-**Important**: The config file should have secure permissions (600) - only you can read/write it.
-
-## 🔧 API Endpoints
-
-### Camera Management
-- `GET /api/cameras` - List configured cameras
-- `GET /camera/:id/stream` - MJPEG stream for specific camera
-- `POST /api/camera/:id/cleanup` - Force cleanup streams for camera
-
-### Health & Monitoring
-- `GET /api/health` - System health and active stream status
-
-Example health response:
-```json
-{
-  "status": "ok",
-  "activeStreams": 4,
-  "streamsByCamera": {
-    "1": { "count": 1, "uptime": 3600 }
-  },
-  "uptime": 7200,
-  "configuredCameras": 4
-}
-```
+**Important**: The config file has secure permissions (600) - only you can read/write it.
 
 ### Service Management
 
@@ -217,50 +120,15 @@ The system is configured to:
 - **Reconnect**: Click "Reconnect All" to restart all camera streams
 - **Status Indicators**: Green = connected, Red = disconnected
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
-### Common Issues
+### Camera Connection Issues
+1. Verify RTSP URLs are correct in `config.json`
+2. Test RTSP streams manually with VLC or ffmpeg
+3. Check network connectivity to cameras
+4. Review service logs: `sudo journalctl -u camera-monitor -f`
 
-#### 1. FFmpeg Not Found
-```bash
-# Install FFmpeg
-# Ubuntu/Debian:
-sudo apt update && sudo apt install ffmpeg
-
-# macOS:
-brew install ffmpeg
-
-# Verify installation:
-ffmpeg -version
-```
-
-#### 2. Camera Won't Connect
-- **Check network connectivity:** `ping camera-ip`
-- **Verify RTSP URL format** for your camera model
-- **Test with VLC:** Open the RTSP URL in VLC Media Player
-- **Check credentials:** Ensure username/password are correct
-- **Firewall issues:** Check if port 554 (RTSP) is accessible
-
-#### 3. High CPU Usage
-- **Reduce resolution:** Lower the `-vf scale` parameter
-- **Decrease frame rate:** Lower the `-r` parameter  
-- **Increase quality value:** Higher `-q:v` number = lower quality/CPU usage
-- **Limit concurrent streams:** Monitor `/api/health` endpoint
-
-#### 4. Memory Leaks
-The application includes automatic cleanup mechanisms:
-- **30-minute stream timeout**
-- **Periodic cleanup** every 20 minutes
-- **Process monitoring** and restart capabilities
-
-### Debug Mode
-Enable verbose logging by modifying `server.js`:
-```javascript
-// Uncomment for detailed FFmpeg output
-// console.log(`FFmpeg stderr: ${data.toString()}`);
-```
-
-### Service Management Issues
+### Service Not Starting
 ```bash
 # Check service status
 sudo systemctl status camera-monitor
@@ -269,82 +137,23 @@ sudo systemctl status camera-monitor
 sudo journalctl -u camera-monitor -n 50
 ```
 
-### Browser Auto-Launch Issues
+### Browser Not Auto-Launching
 1. Ensure you're logged into the desktop environment
 2. Check autostart file: `~/.config/autostart/camera-kiosk.desktop`
 3. Test script manually: `~/launch-kiosk.sh`
 
-## 📊 Performance Optimization
+## Security Notes
 
-### Hardware Recommendations
-- **CPU:** Multi-core processor (4+ cores recommended for 4 cameras)
-- **RAM:** 4GB minimum, 8GB recommended
-- **Network:** Gigabit Ethernet for multiple high-resolution streams
-- **Storage:** SSD recommended for faster startup
+- Camera credentials are stored in `config.json` with 600 permissions
+- Server binds to all interfaces (0.0.0.0) - restrict network access as needed
+- Consider VPN or firewall rules for remote access
 
-### Scaling Considerations
-- **Single camera:** ~50-100MB RAM, 10-20% CPU
-- **Four cameras:** ~200-400MB RAM, 40-80% CPU
-- **Network bandwidth:** ~2-5 Mbps per camera stream
+## Performance Optimization
 
-### Stream Configuration
-The application uses conservative settings for reliability:
-- **Resolution:** 640x480
-- **Frame Rate:** 8 FPS
-- **Quality:** Level 8 (balanced)
-- **Transport:** TCP (reliable)
-
-### Customization
-Modify FFmpeg parameters in `server.js`:
-```javascript
-const ffmpegArgs = [
-  '-rtsp_transport', 'tcp',
-  '-i', camera.rtsp_url,
-  '-f', 'mjpeg',
-  '-vf', 'scale=1280:720',  // Higher resolution
-  '-r', '15',               // Higher frame rate
-  '-q:v', '5',              // Higher quality
-  // ... other options
-];
-```
-
-## 🔧 Utility Scripts
-
-### Camera Testing
-```bash
-# Test all camera endpoints
-./test-cameras.sh
-```
-
-### Recovery & Maintenance
-```bash
-# Fix stuck processes and restart services
-./fix-cameras.sh
-```
-
-## 🎆 Version History
-
-- **v1.0.0** - Initial release with 2x2 grid layout and RTSP streaming
-- Conservative settings for reliability
-- Auto-reconnection with progressive backoff
-- Kiosk mode support
-- Health monitoring API
-
-## 🤝 Contributing
-
-1. **Fork the repository**
-2. **Create a feature branch:** `git checkout -b feature-name`
-3. **Make changes and test thoroughly**
-4. **Commit with clear messages:** `git commit -m "Add feature description"`
-5. **Push and create pull request**
-
-## 📄 License
-
-This project is licensed under the ISC License - see the package.json file for details.
-
----
-
-**Note:** This application is designed for local network use. For internet-facing deployments, implement additional security measures including HTTPS, authentication, and access controls.
+For better performance on Raspberry Pi:
+- Reduce video bitrate in `config.json` under `ffmpeg` settings
+- Use hardware-accelerated codecs if available
+- Limit concurrent streams if experiencing lag
 
 ## Recent Updates ✨
 

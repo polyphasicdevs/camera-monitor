@@ -42,17 +42,19 @@ app.get('/camera/:id/stream', (req, res) => {
         'Access-Control-Allow-Headers': 'Content-Type'
     });
     
-    // Reverted to conservative FFmpeg settings for reliability
+    // Ultra-conservative FFmpeg settings to reduce Pi CPU load
     const ffmpegArgs = [
         '-rtsp_transport', 'tcp',
         '-i', camera.rtsp_url,
         '-f', 'mjpeg',
-        '-vf', 'scale=640:480', // Back to reliable resolution
-        '-r', '8', // Conservative frame rate
-        '-q:v', '8', // Conservative quality
+        '-vf', 'scale=480:360', // Reduced resolution to save CPU
+        '-r', '6', // Lower frame rate to save CPU
+        '-q:v', '12', // Lower quality to save CPU
         '-avoid_negative_ts', 'make_zero',
         '-fflags', '+genpts',
-        '-threads', '1', // Single thread to reduce load
+        '-threads', '1',
+        '-preset', 'ultrafast', // Fastest encoding
+        '-tune', 'zerolatency', // Minimal buffering
         '-'
     ];
     
@@ -101,8 +103,8 @@ app.get('/camera/:id/stream', (req, res) => {
                         res.write(jpegFrame);
                         res.write(footer);
                         
-                        // Log frame rate every 80 frames (about every 10 seconds at 8fps)
-                        if (frameCount % 80 === 0) {
+                        // Log frame rate every 60 frames (about every 10 seconds at 6fps)
+                        if (frameCount % 60 === 0) {
                             console.log(`Camera ${cameraId}: ${frameCount} frames processed`);
                         }
                     } catch (error) {
@@ -151,11 +153,11 @@ app.get('/camera/:id/stream', (req, res) => {
         cleanupStream(streamKey, ffmpeg);
     });
     
-    // Timeout cleanup after 30 minutes
+    // Shorter timeout to prevent resource hogging
     const cleanupTimer = setTimeout(() => {
         console.log(`Cleaning up inactive stream for camera ${cameraId}`);
         cleanupStream(streamKey, ffmpeg);
-    }, 30 * 60 * 1000);
+    }, 20 * 60 * 1000); // 20 minutes instead of 30
     
     streamCleanupTimers.set(cameraId, cleanupTimer);
 });
@@ -191,7 +193,7 @@ app.get('/api/cameras', (req, res) => {
     res.json(cameras);
 });
 
-// Health check endpoint
+// Health check endpoint with CPU monitoring
 app.get('/api/health', (req, res) => {
     const streamsByCamera = {};
     
@@ -212,7 +214,9 @@ app.get('/api/health', (req, res) => {
         activeStreams: activeStreams.size,
         streamsByCamera: streamsByCamera,
         uptime: Math.round(process.uptime()),
-        configuredCameras: config.cameras.length
+        configuredCameras: config.cameras.length,
+        optimizedForPi: true,
+        settings: '480x360 @ 6fps (CPU optimized)'
     });
 });
 
@@ -232,7 +236,7 @@ app.get('/favicon.ico', (req, res) => {
 server.listen(config.server.port, config.server.host, () => {
     console.log(`Camera monitor server running on http://${config.server.host}:${config.server.port}`);
     console.log(`Configured cameras: ${config.cameras.length}`);
-    console.log(`Conservative settings: 640x480 @ 8fps for reliability`);
+    console.log(`Pi-optimized settings: 480x360 @ 6fps for 4-camera support`);
 });
 
 // Graceful shutdown
@@ -258,13 +262,14 @@ function gracefulShutdown() {
     });
 }
 
-// Periodic cleanup - less frequent
+// More aggressive cleanup for Pi resources
 setInterval(() => {
     const now = Date.now();
     let cleaned = 0;
     
     for (let [streamKey, streamInfo] of activeStreams) {
-        if (now - streamInfo.startTime > 60 * 60 * 1000) { // 1 hour
+        // Kill streams older than 30 minutes to prevent resource buildup
+        if (now - streamInfo.startTime > 30 * 60 * 1000) {
             console.log(`Cleaning up old stream for camera ${streamInfo.cameraId}`);
             cleanupStream(streamKey, streamInfo.process);
             cleaned++;
@@ -274,4 +279,4 @@ setInterval(() => {
     if (cleaned > 0) {
         console.log(`Periodic cleanup: removed ${cleaned} old streams`);
     }
-}, 20 * 60 * 1000); // Check every 20 minutes
+}, 10 * 60 * 1000); // Check every 10 minutes
