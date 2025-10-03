@@ -22,7 +22,7 @@ The system has been installed and configured to run automatically at boot.
 Edit the camera credentials in the secure configuration file:
 
 ```bash
-nano /camera-monitor/config.json
+nano /home/james/camera-monitor/config.json
 ```
 
 Update the RTSP URLs for your cameras. Example:
@@ -37,7 +37,7 @@ Update the RTSP URLs for your cameras. Example:
     {
       "id": 2,
       "name": "Back Yard", 
-      "rtsp_url": "rtsp://user:pass@192.168.0.86:554/Streaming/Channels/101"
+      "rtsp_url": "rtsp://user:pass@192.168.0.86:554/stream"
     }
   ]
 }
@@ -69,7 +69,7 @@ sudo systemctl start camera-monitor
 You can test the system manually before reboot:
 
 ```bash
-cd /path/to/camera-monitor
+cd /home/james/camera-monitor
 
 # Start server manually
 npm start
@@ -89,7 +89,7 @@ The system is configured to:
 ## File Structure
 
 ```
-/camera-monitor/
+/home/james/camera-monitor/
 ├── server.js           # Express server with WebSocket streaming
 ├── config.json         # Secure camera credentials (chmod 600)
 ├── package.json        # Node.js dependencies
@@ -99,10 +99,10 @@ The system is configured to:
 │   └── app.js         # Client-side JavaScript
 └── README.md          # This file
 
-/.config/autostart/
+/home/james/.config/autostart/
 └── camera-kiosk.desktop  # Auto-launch browser at login
 
-/launch-kiosk.sh  # Kiosk launcher script
+/home/james/launch-kiosk.sh  # Kiosk launcher script
 
 /etc/systemd/system/
 └── camera-monitor.service   # System service configuration

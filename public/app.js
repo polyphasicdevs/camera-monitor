@@ -5,9 +5,8 @@ class CameraMonitor {
         this.maxReconnectAttempts = 5;
         this.reconnectTimeouts = new Map();
         this.isReconnecting = new Map();
-        this.refreshIntervals = new Map();
         this.autoRefreshEnabled = true;
-        this.autoRefreshInterval = 90000; // 90 seconds
+        this.autoRefreshInterval = 300000; // 5 minutes
         
         this.init();
     }
@@ -25,7 +24,7 @@ class CameraMonitor {
                 this.setupCamera(camera.id, camera.name);
             });
             
-            // Start auto-refresh system
+            // Start simple auto-refresh system
             this.startAutoRefresh();
             
             // Auto-fullscreen after 3 seconds (for kiosk mode)
@@ -54,59 +53,6 @@ class CameraMonitor {
         this.isReconnecting.set(cameraId, false);
         
         this.connectCamera(cameraId);
-        
-        // Set up periodic refresh for this camera
-        this.setupCameraAutoRefresh(cameraId);
-    }
-    
-    setupCameraAutoRefresh(cameraId) {
-        if (this.refreshIntervals.has(cameraId)) {
-            clearInterval(this.refreshIntervals.get(cameraId));
-        }
-        
-        // Stagger the refresh times so not all cameras refresh at once
-        const refreshDelay = this.autoRefreshInterval + (cameraId * 15000); // 15s offset per camera
-        
-        const interval = setInterval(() => {
-            if (this.autoRefreshEnabled && !this.isReconnecting.get(cameraId)) {
-                console.log(`Auto-refreshing camera ${cameraId}`);
-                this.refreshCamera(cameraId, false); // false = don't reset attempts
-            }
-        }, refreshDelay);
-        
-        this.refreshIntervals.set(cameraId, interval);
-    }
-    
-    refreshCamera(cameraId, resetAttempts = true) {
-        if (this.isReconnecting.get(cameraId)) {
-            console.log(`Camera ${cameraId} already reconnecting, skipping refresh`);
-            return;
-        }
-        
-        console.log(`Refreshing camera ${cameraId}`);
-        
-        // Clear existing timeout
-        const existingTimeout = this.reconnectTimeouts.get(cameraId);
-        if (existingTimeout) {
-            clearTimeout(existingTimeout);
-            this.reconnectTimeouts.delete(cameraId);
-        }
-        
-        if (resetAttempts) {
-            this.reconnectAttempts.set(cameraId, 0);
-        }
-        
-        // Clear the current image
-        const img = document.getElementById(`video-${cameraId}`);
-        if (img) {
-            const oldSrc = img.src;
-            img.src = '';
-            
-            // Brief pause then reconnect
-            setTimeout(() => {
-                this.connectCamera(cameraId);
-            }, 500);
-        }
     }
     
     connectCamera(cameraId) {
@@ -140,10 +86,10 @@ class CameraMonitor {
         
         // Add a small delay before connecting to prevent overwhelming the server
         setTimeout(() => {
-            // Set up the image source for MJPEG stream with cache-busting and connection tracking
+            // Set up the image source for MJPEG stream with cache-busting
             const timestamp = Date.now();
             const random = Math.random().toString(36).substr(2, 9);
-            const streamUrl = `/camera/${cameraId}/stream?t=${timestamp}&r=${random}&client=web`;
+            const streamUrl = `/camera/${cameraId}/stream?t=${timestamp}&r=${random}`;
             console.log(`Connecting to camera ${cameraId} stream:`, streamUrl);
             
             // Set up event handlers before setting src
@@ -164,12 +110,11 @@ class CameraMonitor {
             img.onabort = () => {
                 console.log(`Camera ${cameraId} stream aborted`);
                 this.isReconnecting.set(cameraId, false);
-                // Don't treat abort as an error, it might be intentional
             };
             
             // Set the source to start the stream
             img.src = streamUrl;
-        }, cameraId * 200); // Increased stagger to 200ms per camera
+        }, cameraId * 200);
     }
     
     handleConnectionError(cameraId) {
@@ -188,7 +133,7 @@ class CameraMonitor {
         const attempts = this.reconnectAttempts.get(cameraId) || 0;
         if (attempts < this.maxReconnectAttempts) {
             this.reconnectAttempts.set(cameraId, attempts + 1);
-            const delay = 3000 + (attempts * 2000); // Longer delays: 3s, 5s, 7s, 9s, 11s
+            const delay = 3000 + (attempts * 2000);
             
             if (loading) {
                 loading.textContent = `Connection lost. Retrying in ${Math.ceil(delay/1000)}s... (${attempts + 1}/${this.maxReconnectAttempts})`;
@@ -208,7 +153,6 @@ class CameraMonitor {
                 loading.style.color = '#ff4444';
                 loading.style.display = 'block';
             }
-            // Clear the image source
             img.src = '';
             this.isReconnecting.set(cameraId, false);
         }
@@ -216,7 +160,28 @@ class CameraMonitor {
     
     reconnectCamera(cameraId) {
         console.log(`Manual reconnect for camera ${cameraId}`);
-        this.refreshCamera(cameraId, true);
+        
+        // Clear any existing timeouts
+        const existingTimeout = this.reconnectTimeouts.get(cameraId);
+        if (existingTimeout) {
+            clearTimeout(existingTimeout);
+            this.reconnectTimeouts.delete(cameraId);
+        }
+        
+        // Reset reconnection attempts and flags
+        this.reconnectAttempts.set(cameraId, 0);
+        this.isReconnecting.set(cameraId, false);
+        
+        // Clear the current image
+        const img = document.getElementById(`video-${cameraId}`);
+        if (img) {
+            img.src = '';
+        }
+        
+        // Reconnect after a short delay
+        setTimeout(() => {
+            this.connectCamera(cameraId);
+        }, 500);
     }
     
     reconnectAll() {
@@ -236,36 +201,37 @@ class CameraMonitor {
             }
         });
         
-        // Reconnect cameras with staggered timing to prevent overwhelming the server
+        // Reconnect cameras with staggered timing
         this.cameras.forEach((camera, index) => {
             setTimeout(() => {
-                this.refreshCamera(camera.id, true);
-            }, index * 1500); // Increased to 1.5 second delay between each camera
+                this.reconnectCamera(camera.id);
+            }, index * 1500);
         });
     }
     
     startAutoRefresh() {
-        console.log('Auto-refresh system started');
+        if (!this.autoRefreshEnabled) return;
         
-        // Global refresh every 5 minutes as a fallback
+        console.log(`Auto-refresh enabled: page will refresh every ${this.autoRefreshInterval / 1000} seconds`);
+        
+        // Simple page refresh every minute
         setInterval(() => {
-            console.log('Global refresh check - ensuring all cameras are healthy');
-            this.cameras.forEach(camera => {
-                const img = document.getElementById(`video-${camera.id}`);
-                const status = document.getElementById(`status-${camera.id}`);
-                
-                // If camera shows as disconnected for too long, refresh it
-                if (status && !status.classList.contains('connected')) {
-                    console.log(`Camera ${camera.id} appears stuck, forcing refresh`);
-                    this.refreshCamera(camera.id, false);
-                }
-            });
-        }, 5 * 60 * 1000); // Every 5 minutes
+            if (this.autoRefreshEnabled) {
+                console.log('Auto-refreshing entire page...');
+                window.location.reload();
+            }
+        }, this.autoRefreshInterval);
     }
     
     toggleAutoRefresh() {
         this.autoRefreshEnabled = !this.autoRefreshEnabled;
         console.log(`Auto-refresh ${this.autoRefreshEnabled ? 'enabled' : 'disabled'}`);
+        
+        if (this.autoRefreshEnabled) {
+            // Restart auto-refresh
+            this.startAutoRefresh();
+        }
+        
         return this.autoRefreshEnabled;
     }
     
@@ -288,7 +254,7 @@ class CameraMonitor {
             document.exitFullscreen();
         } else if (document.webkitExitFullscreen) {
             document.webkitExitFullscreen();
-        } else if (document.msExitFullscreen) {
+        } else if (document.msExitFullScreen) {
             document.msExitFullscreen();
         }
     }
@@ -315,14 +281,12 @@ function toggleFullscreen() {
     }
 }
 
-// Individual camera reconnect function
 function reconnectCamera(cameraId) {
     if (window.cameraMonitor) {
         window.cameraMonitor.reconnectCamera(cameraId);
     }
 }
 
-// Toggle auto-refresh function
 function toggleAutoRefresh() {
     if (window.cameraMonitor) {
         const enabled = window.cameraMonitor.toggleAutoRefresh();
