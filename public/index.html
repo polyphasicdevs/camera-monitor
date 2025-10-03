@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        .container {
+            width: 100vw;
+            height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 1px; /* Reduced gap for more space */
+        }
+        
+        .camera-feed {
+            position: relative;
+            background-color: #1a1a1a;
+            border: none; /* Removed border for cleaner look */
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .camera-feed:hover .camera-reconnect {
+            opacity: 1;
+        }
+        
+        .camera-feed img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain; /* Changed from contain to cover for full coverage */
+        }
+        
+        .camera-label {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 10;
+            backdrop-filter: blur(4px);
+        }
+        
+        .status-indicator {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #ff4444;
+            z-index: 10;
+            box-shadow: 0 0 4px rgba(0,0,0,0.5);
+        }
+        
+        .status-indicator.connected {
+            background-color: #44ff44;
+            box-shadow: 0 0 6px rgba(68,255,68,0.4);
+        }
+        
+        .camera-reconnect {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 3px 6px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 10px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 10;
+            backdrop-filter: blur(4px);
+        }
+        
+        .camera-reconnect:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .error-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #ff4444;
+            font-size: 16px;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #888;
+            font-size: 12px;
+            max-width: 80%;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.9);
+            border-radius: 6px;
+            z-index: 5;
+            backdrop-filter: blur(4px);
+        }
+        
+        .controls {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            z-index: 100;
+            display: flex;
+            gap: 8px;
+            transition: opacity 0.3s ease;
+        }
+        
+        .control-btn {
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(4px);
+        }
+        
+        .control-btn:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .control-btn:active {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .control-btn:disabled {
+            background-color: rgba(0, 0, 0, 0.5);
+            border-color: rgba(255, 255, 255, 0.1);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        
+        /* Enhanced responsive design */
+        @media (max-width: 1200px) {
+            .camera-label {
+                font-size: 12px;
+                padding: 3px 6px;
+            }
+            
+            .loading {
+                font-size: 11px;
+            }
+        }
+        
+        @media (max-width: 800px) {
+            .controls {
+                top: 10px;
+                right: 10px;
+                flex-direction: column;
+                gap: 4px;
+            }
+            
+            .control-btn {
+                font-size: 10px;
+                padding: 4px 8px;
+            }
+            
+            .camera-label {
+                font-size: 11px;
+                padding: 2px 5px;
+            }
+            
+            .loading {
+                font-size: 10px;
+                padding: 6px;
+            }
+            
+            .camera-reconnect {
+                font-size: 9px;
+                padding: 2px 4px;
+            }
+        }
+        
+        /* Ultra-wide screen optimization */
+        @media (min-aspect-ratio: 21/9) {
+            .container {
+                grid-template-columns: 1fr 1fr 1fr 1fr;
+                grid-template-rows: 1fr;
+            }
+        }
+        
+        /* Portrait orientation optimization */
+        @media (orientation: portrait) {
+            .container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 1fr 1fr 1fr 1fr;
+            }
+        }
+        
+        /* Loading animation - enhanced */
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            margin-left: 4px;
+            border: 2px solid #888;
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        /* Status message for reconnect all */
+        .reconnect-status {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            padding: 16px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 1000;
+            display: none;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        /* Fullscreen optimizations */
+        html:fullscreen,
+        html:-webkit-full-screen,
+        html:-moz-full-screen {
+            background-color: #000;
+        }
+        
+        html:fullscreen .container,
+        html:-webkit-full-screen .container,
+        html:-moz-full-screen .container {
+            gap: 0px; /* No gaps in fullscreen for maximum coverage */
+        }
+        
+        /* High DPI display optimization */
+        @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+            .camera-label,
+            .control-btn,
+            .loading {
+                font-size: 110%; /* Slightly larger text on high DPI */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="camera-feed" id="camera-1">
+            <div class="camera-label">Garden Cam</div>
+            <div class="status-indicator" id="status-1"></div>
+            <div class="loading" id="loading-1">Connecting...</div>
+            <button class="camera-reconnect" onclick="reconnectCamera(1)">Reconnect</button>
+            <img id="video-1" alt="Camera 1 Feed" />
+        </div>
+        
+        <div class="camera-feed" id="camera-2">
+            <div class="camera-label">Garden View</div>
+            <div class="status-indicator" id="status-2"></div>
+            <div class="loading" id="loading-2">Connecting...</div>
+            <button class="camera-reconnect" onclick="reconnectCamera(2)">Reconnect</button>
+            <img id="video-2" alt="Camera 2 Feed" />
+        </div>
+        
+        <div class="camera-feed" id="camera-3">
+            <div class="camera-label">Garage Cam</div>
+            <div class="status-indicator" id="status-3"></div>
+            <div class="loading" id="loading-3">Connecting...</div>
+            <button class="camera-reconnect" onclick="reconnectCamera(3)">Reconnect</button>
+            <img id="video-3" alt="Camera 3 Feed" />
+        </div>
+        
+        <div class="camera-feed" id="camera-4">
+            <div class="camera-label">Rear Garden Cam</div>
+            <div class="status-indicator" id="status-4"></div>
+            <div class="loading" id="loading-4">Connecting...</div>
+            <button class="camera-reconnect" onclick="reconnectCamera(4)">Reconnect</button>
+            <img id="video-4" alt="Camera 4 Feed" />
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button class="control-btn" id="reconnect-all-btn" onclick="reconnectAll()">Reconnect All</button>
+        <button class="control-btn" onclick="toggleFullscreen()">Fullscreen</button>
+    </div>
+    
+    <div class="reconnect-status" id="reconnect-status">
+        Reconnecting cameras...
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
